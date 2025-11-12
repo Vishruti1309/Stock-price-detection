@@ -5,5 +5,4 @@ numpy==1.26.4
 plotly==5.24.1
 scikit-learn==1.5.2
 keras==3.3.3
-keras-core==0.1.7
 setuptools
