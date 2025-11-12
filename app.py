@@ -57,70 +57,71 @@ def build_model(input_shape):
     model.compile(optimizer='adam', loss = 'mean_squared_error')
     return model
 
-st.title('Stock Price Prediction')
+st.title('📈 Stock Price Prediction')
 
-stock_list = ['AAPL', 'MSFT', 'GOOGL', 'TSLA', 'AMZN']
-selected_stock = st.selectbox('Select the Stock:', stock_list)
+# Let the user type or paste any stock symbol
+selected_stock = st.text_input("Enter Stock Symbol (e.g., AAPL, TSLA, INFY.NS):", value="AAPL")
 
-st.write(f"Fetching data for {selected_stock}...")
-data = fetch_data(selected_stock)
-latest_price = data['Close'].iloc[-1]
-st.write(f'Latest Price: ${latest_price:.2f}')
+if selected_stock:
+    st.write(f"Fetching data for {selected_stock}...")
+    data = fetch_data(selected_stock)
 
-if st.button("Train and Predict"):
-    st.write("Please Wait...")
-
-    if selected_stock in model_cache:
-        model, scaler = model_cache[selected_stock]
+    # Handle invalid or empty data
+    if data.empty:
+        st.error("❌ No data found. Please check the stock symbol and try again.")
     else:
-        data = preprocess_data(data)
-        scaled_data, scaler = normalize_data(data)
+        latest_price = data['Close'].iloc[-1]
+        st.write(f'Latest Price: ${latest_price:.2f}')
 
-        X, y = prepare_data(scaled_data)
+        if st.button("Train and Predict"):
+            st.write("⏳ Please Wait...")
 
-        x_train, x_test, y_train, y_test = train_test_split(X,y, test_size=0.2, random_state=42)
-        model = build_model((x_train.shape[1], x_train.shape[2]))
-        model.fit(x_train, y_train, batch_size=32, epochs=5)
+            if selected_stock in model_cache:
+                model, scaler = model_cache[selected_stock]
+            else:
+                data = preprocess_data(data)
+                scaled_data, scaler = normalize_data(data)
 
-        loss = model.evaluate(x_test, y_test, verbose=0)
-        st.write(f"Model Evaluation - MSE: {loss:.4f}")
+                X, y = prepare_data(scaled_data)
+                x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-        model_cache[selected_stock] = (model, scaler)
+                model = build_model((x_train.shape[1], x_train.shape[2]))
+                model.fit(x_train, y_train, batch_size=32, epochs=5, verbose=1)
 
-    st.write("Predicting prices for the next 10 days...")
-    predictions = []
-    input_sequence = scaled_data[-60:]
+                loss = model.evaluate(x_test, y_test, verbose=0)
+                st.write(f"✅ Model Evaluation - MSE: {loss:.4f}")
 
-    for day in range(10):
-        input_sequence = input_sequence.reshape(1, -1, 1)
-        predicted_price = model.predict(input_sequence)[0][0]
-        predictions.append(predicted_price)
+                model_cache[selected_stock] = (model, scaler)
 
-        input_sequence = np.append(input_sequence[0][1:], [[predicted_price]], axis = 0)
+            st.write("🔮 Predicting prices for the next 10 days...")
+            predictions = []
+            input_sequence = scaled_data[-60:]
 
-    predictions = scaler.inverse_transform(np.array(predictions).reshape(-1, 1))[:,0]
+            for day in range(10):
+                input_sequence = input_sequence.reshape(1, -1, 1)
+                predicted_price = model.predict(input_sequence)[0][0]
+                predictions.append(predicted_price)
+                input_sequence = np.append(input_sequence[0][1:], [[predicted_price]], axis=0)
 
-    days = pd.date_range(start=pd.Timestamp.now() + pd.DateOffset(1), periods=10).strftime('%Y-%m-%d').tolist()
-    prediction_df = pd.DataFrame({
-        'Date': days,
-        "Predicted Price":predictions
+            predictions = scaler.inverse_transform(np.array(predictions).reshape(-1, 1))[:, 0]
 
-    })
+            days = pd.date_range(start=pd.Timestamp.now() + pd.DateOffset(1), periods=10).strftime('%Y-%m-%d').tolist()
+            prediction_df = pd.DataFrame({'Date': days, "Predicted Price": predictions})
 
-    st.write("Predicted Price:")
-    st.table(prediction_df)
+            st.write("📊 Predicted Prices:")
+            st.table(prediction_df)
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=prediction_df['Date'],
-        y=prediction_df['Predicted Price'],
-        mode = 'lines+markers',
-        name = 'Predicted Prices'
-    ))
-    fig.update_layout(
-        title=f"10-Days Price Prediction for {selected_stock}",
-        xaxis_title="Date",
-        yaxis_title="Price ($)",
-        template = "plotly_dark"
-    )
-    st.plotly_chart(fig)
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=prediction_df['Date'],
+                y=prediction_df['Predicted Price'],
+                mode='lines+markers',
+                name='Predicted Prices'
+            ))
+            fig.update_layout(
+                title=f"10-Day Price Prediction for {selected_stock}",
+                xaxis_title="Date",
+                yaxis_title="Price ($)",
+                template="plotly_dark"
+            )
+            st.plotly_chart(fig)
