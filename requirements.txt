@@ -1,0 +1,9 @@
+python==3.10
+tensorflow==2.10.0
+keras==2.10.0
+numpy
+pandas
+streamlit
+scikit-learn
+yfinance
+matplotlib
